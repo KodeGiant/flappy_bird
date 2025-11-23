@@ -160,6 +160,7 @@ function playCoinSound() {
 // Game State
 let frames = 0;
 let score = 0;
+let lives = 1;
 let bestScore = localStorage.getItem('flappy_best_score') || 0;
 let gameState = 'START'; // START, PLAYING, GAMEOVER, ENTERING_NAME
 let gameSpeed = 3;
@@ -194,7 +195,8 @@ const POWERUP_TYPES = {
     slowdown: { color: '#00BFFF', icon: '⏱', duration: 300 },      // 5 seconds at 60fps
     invincibility: { color: '#FFD700', icon: '⭐', duration: 180 }, // 3 seconds
     magnet: { color: '#FF69B4', icon: '🧲', duration: 360 },       // 6 seconds
-    tiny: { color: '#90EE90', icon: '🔬', duration: 240 }          // 4 seconds
+    tiny: { color: '#90EE90', icon: '🔬', duration: 240 },         // 4 seconds
+    extralife: { color: '#FF4444', icon: '❤️', duration: 0 }        // Instant effect
 };
 
 // Powerups system
@@ -270,7 +272,11 @@ const powerups = {
             if (distance < birdRadius + this.size) {
                 // Powerup collected!
                 this.items.splice(i, 1);
-                activePowerups[p.type] = POWERUP_TYPES[p.type].duration;
+                if (p.type === 'extralife') {
+                    lives++;
+                } else {
+                    activePowerups[p.type] = POWERUP_TYPES[p.type].duration;
+                }
                 playPowerupSound();
                 continue;
             }
@@ -814,13 +820,25 @@ function startGame() {
     pipes.reset();
     coins.reset();
     powerups.reset();
+    lives = 1;
     frames = 0;
     startBgMusic();
 }
 
 function gameOver() {
-    stopBgMusic();
     createBlood(bird.x, bird.y);
+
+    // Check if we have extra lives
+    if (lives > 0) {
+        lives--;
+        // Give brief invincibility and reset bird position
+        activePowerups.invincibility = 120; // 2 seconds of invincibility
+        bird.y = canvas.height / 2;
+        bird.velocity = 0;
+        return;
+    }
+
+    stopBgMusic();
     if (score > bestScore) {
         bestScore = score;
         localStorage.setItem('flappy_best_score', bestScore);
@@ -904,6 +922,17 @@ function skipHighScore() {
 }
 
 // Draw active powerup indicators
+// Draw lives indicator
+function drawLives() {
+    ctx.save();
+    ctx.font = '20px Arial';
+    ctx.fillStyle = '#FF4444';
+    ctx.textAlign = 'right';
+    const heartsText = '❤️'.repeat(lives + 1); // +1 because lives=1 means 2 total (current + 1 extra)
+    ctx.fillText(heartsText, canvas.width - 10, 30);
+    ctx.restore();
+}
+
 function drawPowerupIndicators() {
     let offsetY = 60;
     for (let key in activePowerups) {
@@ -953,6 +982,7 @@ function gameLoop() {
         bird.update();
         bird.draw();
         drawPowerupIndicators();
+        drawLives();
         frames++;
     } else if (gameState === 'START') {
         bird.y = canvas.height / 2 + Math.sin(Date.now() / 300) * 10;

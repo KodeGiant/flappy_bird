@@ -10,6 +10,12 @@ const bestScoreEl = document.getElementById('bestScore');
 const startBtn = document.getElementById('startBtn');
 const restartBtn = document.getElementById('restartBtn');
 const persistentBestValue = document.getElementById('persistentBestValue');
+const nameInputModal = document.getElementById('nameInputModal');
+const playerNameInput = document.getElementById('playerName');
+const submitNameBtn = document.getElementById('submitNameBtn');
+const newHighScoreEl = document.getElementById('newHighScore');
+const startLeaderboard = document.getElementById('startLeaderboard');
+const gameOverLeaderboard = document.getElementById('gameOverLeaderboard');
 
 // Audio
 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -40,8 +46,64 @@ function playJumpSound() {
 let frames = 0;
 let score = 0;
 let bestScore = localStorage.getItem('flappy_best_score') || 0;
-let gameState = 'START'; // START, PLAYING, GAMEOVER
+let gameState = 'START'; // START, PLAYING, GAMEOVER, ENTERING_NAME
 let gameSpeed = 3;
+let pendingScore = 0; // Score waiting to be saved with name
+
+// Leaderboard
+const MAX_LEADERBOARD_ENTRIES = 10;
+
+function getLeaderboard() {
+    const data = localStorage.getItem('flappy_leaderboard');
+    return data ? JSON.parse(data) : [];
+}
+
+function saveLeaderboard(leaderboard) {
+    localStorage.setItem('flappy_leaderboard', JSON.stringify(leaderboard));
+}
+
+function isTopScore(newScore) {
+    if (newScore <= 0) return false;
+    const leaderboard = getLeaderboard();
+    if (leaderboard.length < MAX_LEADERBOARD_ENTRIES) return true;
+    return newScore > leaderboard[leaderboard.length - 1].score;
+}
+
+function addToLeaderboard(name, newScore) {
+    const leaderboard = getLeaderboard();
+    leaderboard.push({ name: name.toUpperCase(), score: newScore });
+    leaderboard.sort((a, b) => b.score - a.score);
+    if (leaderboard.length > MAX_LEADERBOARD_ENTRIES) {
+        leaderboard.length = MAX_LEADERBOARD_ENTRIES;
+    }
+    saveLeaderboard(leaderboard);
+    return leaderboard;
+}
+
+function renderLeaderboard(container, highlightScore = null) {
+    const leaderboard = getLeaderboard();
+
+    if (leaderboard.length === 0) {
+        container.innerHTML = `
+            <div class="leaderboard-title">Top 10</div>
+            <div class="leaderboard-empty">No scores yet. Be the first!</div>
+        `;
+        return;
+    }
+
+    let html = '<div class="leaderboard-title">Top 10</div>';
+    leaderboard.forEach((entry, index) => {
+        const isHighlight = highlightScore !== null && entry.score === highlightScore;
+        html += `
+            <div class="leaderboard-entry${isHighlight ? ' highlight' : ''}">
+                <span class="leaderboard-rank">${index + 1}.</span>
+                <span class="leaderboard-name">${entry.name}</span>
+                <span class="leaderboard-score">${entry.score}</span>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
 
 // Resize Canvas
 function resizeCanvas() {
@@ -317,27 +379,54 @@ function startGame() {
 }
 
 function gameOver() {
-    gameState = 'GAMEOVER';
     createBlood(bird.x, bird.y);
     if (score > bestScore) {
         bestScore = score;
         localStorage.setItem('flappy_best_score', bestScore);
     }
-    currentScoreEl.innerText = score;
-    bestScoreEl.innerText = bestScore;
     persistentBestValue.innerText = bestScore;
-
     scoreDisplay.classList.add('hidden');
-    gameOverScreen.classList.remove('hidden');
+
+    // Check if score qualifies for leaderboard
+    if (isTopScore(score)) {
+        gameState = 'ENTERING_NAME';
+        pendingScore = score;
+        newHighScoreEl.innerText = score;
+        playerNameInput.value = '';
+        nameInputModal.classList.remove('hidden');
+        playerNameInput.focus();
+    } else {
+        gameState = 'GAMEOVER';
+        currentScoreEl.innerText = score;
+        bestScoreEl.innerText = bestScore;
+        renderLeaderboard(gameOverLeaderboard, null);
+        gameOverScreen.classList.remove('hidden');
+    }
 }
 
 function resetGame() {
     gameState = 'START';
     gameOverScreen.classList.add('hidden');
+    nameInputModal.classList.add('hidden');
+    renderLeaderboard(startLeaderboard);
     startScreen.classList.remove('hidden');
     bird.reset();
     pipes.reset();
     particles.length = 0;
+}
+
+function submitHighScore() {
+    let name = playerNameInput.value.trim();
+    if (!name) name = 'AAA';
+
+    addToLeaderboard(name, pendingScore);
+
+    gameState = 'GAMEOVER';
+    nameInputModal.classList.add('hidden');
+    currentScoreEl.innerText = pendingScore;
+    bestScoreEl.innerText = bestScore;
+    renderLeaderboard(gameOverLeaderboard, pendingScore);
+    gameOverScreen.classList.remove('hidden');
 }
 
 function gameLoop() {
@@ -355,7 +444,7 @@ function gameLoop() {
     } else if (gameState === 'START') {
         bird.y = canvas.height / 2 + Math.sin(Date.now() / 300) * 10;
         bird.draw();
-    } else if (gameState === 'GAMEOVER') {
+    } else if (gameState === 'GAMEOVER' || gameState === 'ENTERING_NAME') {
         pipes.draw();
         bird.draw();
         handleParticles();
@@ -366,15 +455,21 @@ function gameLoop() {
 
 // Input Listeners
 window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space') {
+    if (e.code === 'Space' && gameState !== 'ENTERING_NAME') {
         e.preventDefault();
         jump();
     }
 });
-window.addEventListener('mousedown', jump);
+window.addEventListener('mousedown', (e) => {
+    if (gameState !== 'ENTERING_NAME') {
+        jump();
+    }
+});
 window.addEventListener('touchstart', (e) => {
-    e.preventDefault(); // prevent scrolling
-    jump();
+    if (gameState !== 'ENTERING_NAME') {
+        e.preventDefault(); // prevent scrolling
+        jump();
+    }
 }, { passive: false });
 
 startBtn.addEventListener('click', (e) => {
@@ -387,7 +482,26 @@ restartBtn.addEventListener('click', (e) => {
     resetGame();
 });
 
+submitNameBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    submitHighScore();
+});
+
+playerNameInput.addEventListener('keydown', (e) => {
+    if (e.code === 'Enter') {
+        e.preventDefault();
+        submitHighScore();
+    }
+    e.stopPropagation();
+});
+
+// Prevent space from triggering jump while typing name
+playerNameInput.addEventListener('keyup', (e) => {
+    e.stopPropagation();
+});
+
 // Init
 bird.reset();
 persistentBestValue.innerText = bestScore;
+renderLeaderboard(startLeaderboard);
 gameLoop();

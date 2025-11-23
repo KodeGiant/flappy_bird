@@ -184,3 +184,106 @@ canvas {
     border-radius: 20px;
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
+
+.leaderboard {
+    background: var(--ui-bg);
+    border: 1px solid var(--ui-border);
+    border-radius: 15px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    width: 280px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.leaderboard-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    text-align: center;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.leaderboard-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0.5rem;
+    border-radius: 8px;
+    color: var(--text-color);
+    font-size: 0.9rem;
+}
+
+.leaderboard-entry:nth-child(odd) {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.leaderboard-entry.highlight {
+    background: rgba(255, 215, 0, 0.3);
+    border: 1px solid var(--primary-color);
+}
+
+.leaderboard-rank {
+    font-weight: 700;
+    width: 25px;
+    color: var(--primary-color);
+}
+
+.leaderboard-name {
+    flex: 1;
+    text-align: left;
+    margin-left: 0.5rem;
+}
+
+.leaderboard-score {
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.leaderboard-empty {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.9rem;
+    padding: 1rem;
+}
+
+.name-input-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.name-input-container label {
+    font-size: 1.1rem;
+    color: var(--text-color);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.name-input-container input {
+    width: 200px;
+    padding: 0.75rem 1rem;
+    font-size: 1.5rem;
+    font-family: var(--font-main);
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+    border: 2px solid var(--ui-border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #333;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.name-input-container input:focus {
+    border-color: var(--primary-color);
+}
+
+.name-input-container input::placeholder {
+    color: #aaa;
+}

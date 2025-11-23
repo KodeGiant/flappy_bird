@@ -18,6 +18,7 @@
         <div id="startScreen" class="ui-layer">
             <h1 class="title">FLAPPY<br>BIRD</h1>
             <p class="subtitle">Press Space or Click to Jump</p>
+            <div id="startLeaderboard" class="leaderboard"></div>
             <button id="startBtn" class="btn-primary">START GAME</button>
         </div>
 
@@ -33,7 +34,23 @@
                     <span id="bestScore">0</span>
                 </div>
             </div>
+            <div id="gameOverLeaderboard" class="leaderboard"></div>
             <button id="restartBtn" class="btn-primary">TRY AGAIN</button>
+        </div>
+
+        <div id="nameInputModal" class="ui-layer hidden">
+            <h2 class="game-over-title">NEW HIGH SCORE!</h2>
+            <div class="score-board">
+                <div class="score-item">
+                    <span>SCORE</span>
+                    <span id="newHighScore">0</span>
+                </div>
+            </div>
+            <div class="name-input-container">
+                <label for="playerName">Enter Your Name</label>
+                <input type="text" id="playerName" maxlength="10" placeholder="AAA" autocomplete="off">
+                <button id="submitNameBtn" class="btn-primary">SUBMIT</button>
+            </div>
         </div>
 
         <div id="scoreDisplay" class="hidden">0</div>

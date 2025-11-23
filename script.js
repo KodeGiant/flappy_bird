@@ -11,6 +11,31 @@ const startBtn = document.getElementById('startBtn');
 const restartBtn = document.getElementById('restartBtn');
 const persistentBestValue = document.getElementById('persistentBestValue');
 
+// Audio
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+const audioCtx = new AudioContext();
+
+function playJumpSound() {
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.1);
+
+    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.1);
+}
+
 // Game State
 let frames = 0;
 let score = 0;
@@ -217,12 +242,65 @@ const background = {
     }
 };
 
+// Particle System
+const particles = [];
+
+class Particle {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.size = Math.random() * 5 + 2;
+        this.speedX = Math.random() * 6 - 3;
+        this.speedY = Math.random() * 6 - 3;
+        this.color = '#8a0303'; // Blood red
+        this.alpha = 1;
+        this.gravity = 0.1;
+    }
+
+    update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.speedY += this.gravity;
+        this.alpha -= 0.02;
+        if (this.alpha < 0) this.alpha = 0;
+    }
+
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+function createBlood(x, y) {
+    for (let i = 0; i < 30; i++) {
+        particles.push(new Particle(x, y));
+    }
+}
+
+function handleParticles() {
+    for (let i = 0; i < particles.length; i++) {
+        particles[i].update();
+        particles[i].draw();
+        if (particles[i].alpha <= 0) {
+            particles.splice(i, 1);
+            i--;
+        }
+    }
+}
+
 // Controls
 function jump() {
     if (gameState === 'START') {
         startGame();
+        playJumpSound();
     } else if (gameState === 'PLAYING') {
         bird.jump();
+        playJumpSound();
     }
 }
 
@@ -240,6 +318,7 @@ function startGame() {
 
 function gameOver() {
     gameState = 'GAMEOVER';
+    createBlood(bird.x, bird.y);
     if (score > bestScore) {
         bestScore = score;
         localStorage.setItem('flappy_best_score', bestScore);
@@ -258,6 +337,7 @@ function resetGame() {
     startScreen.classList.remove('hidden');
     bird.reset();
     pipes.reset();
+    particles.length = 0;
 }
 
 function gameLoop() {
@@ -278,6 +358,7 @@ function gameLoop() {
     } else if (gameState === 'GAMEOVER') {
         pipes.draw();
         bird.draw();
+        handleParticles();
     }
 
     requestAnimationFrame(gameLoop);

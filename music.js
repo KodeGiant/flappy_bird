@@ -101,6 +101,26 @@ const musicTracks = {
             147, 0, 147, 0, 131, 0, 131, 0, 147, 0, 147, 0, 196, 0, 196, 0
         ]
     },
+    phonk: {
+        name: 'Phonk Remix',
+        tempo: 140,
+        melodyType: 'sawtooth',
+        bassType: 'square',
+        melodyVolume: 0.04,
+        bassVolume: 0.12,
+        melody: [
+            0, 0, 311, 0, 0, 0, 311, 0, 0, 0, 370, 0, 311, 0, 0, 0,
+            0, 0, 294, 0, 0, 0, 294, 0, 0, 0, 349, 0, 294, 0, 0, 0,
+            0, 0, 262, 0, 0, 0, 262, 0, 0, 0, 311, 0, 262, 0, 0, 0,
+            0, 0, 247, 0, 0, 0, 294, 0, 0, 0, 311, 0, 349, 0, 311, 0
+        ],
+        bass: [
+            78, 0, 78, 0, 78, 0, 78, 0, 78, 0, 78, 0, 78, 0, 78, 0,
+            73, 0, 73, 0, 73, 0, 73, 0, 73, 0, 73, 0, 73, 0, 73, 0,
+            65, 0, 65, 0, 65, 0, 65, 0, 65, 0, 65, 0, 65, 0, 65, 0,
+            62, 0, 62, 0, 62, 0, 73, 0, 78, 0, 78, 0, 87, 0, 78, 0
+        ]
+    },
     none: {
         name: 'No Music',
         tempo: 0,
@@ -192,23 +212,24 @@ function updateMusicSelector() {
 function initMusicSelector() {
     const musicSelector = document.getElementById('musicSelector');
     if (!musicSelector) return;
-    let html = '<div class="music-selector-label">Music</div><div class="music-buttons">';
+
+    let html = '<label class="music-selector-label" for="musicSelect">Music</label>';
+    html += '<select id="musicSelect" class="music-select">';
     for (const [id, track] of Object.entries(musicTracks)) {
-        const isActive = id === currentTrack ? ' active' : '';
-        html += `<button class="music-btn${isActive}" data-track="${id}">${track.name}</button>`;
+        const isSelected = id === currentTrack ? ' selected' : '';
+        html += `<option value="${id}"${isSelected}>${track.name}</option>`;
     }
-    html += '</div>';
+    html += '</select>';
     musicSelector.innerHTML = html;
 
     // Stop propagation on the entire selector to prevent triggering jump
     musicSelector.addEventListener('mousedown', (e) => e.stopPropagation());
     musicSelector.addEventListener('touchstart', (e) => e.stopPropagation());
 
-    musicSelector.querySelectorAll('.music-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            setMusicTrack(btn.dataset.track);
-        });
+    const select = document.getElementById('musicSelect');
+    select.addEventListener('change', (e) => {
+        e.stopPropagation();
+        setMusicTrack(e.target.value);
     });
 }
 

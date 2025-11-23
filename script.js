@@ -711,6 +711,7 @@ function startGame() {
 
 function gameOver() {
     createBlood(bird.x, bird.y);
+    playDeathSound();
 
     // Check if we have extra lives
     if (lives > 0) {

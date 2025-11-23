@@ -295,6 +295,28 @@ function playCoinSound() {
     oscillator.stop(audioCtx.currentTime + 0.15);
 }
 
+function playDeathSound() {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    // Descending tone for death
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    oscillator.type = 'sawtooth';
+    oscillator.frequency.setValueAtTime(400, audioCtx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+    oscillator.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+
+    gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.5);
+}
+
 function playPowerupSound() {
     if (audioCtx.state === 'suspended') audioCtx.resume();
     const oscillator = audioCtx.createOscillator();

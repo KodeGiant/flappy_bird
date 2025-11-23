@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="startScreen" class="ui-layer">
+            <h1 class="title">FLAPPY<br>BIRD</h1>
+            <p class="subtitle">Press Space or Click to Jump</p>
+            <button id="startBtn" class="btn-primary">START GAME</button>
+        </div>
+
+        <div id="gameOverScreen" class="ui-layer hidden">
+            <h2 class="game-over-title">GAME OVER</h2>
+            <div class="score-board">
+                <div class="score-item">
+                    <span>SCORE</span>
+                    <span id="currentScore">0</span>
+                </div>
+                <div class="score-item">
+                    <span>BEST</span>
+                    <span id="bestScore">0</span>
+                </div>
+            </div>
+            <button id="restartBtn" class="btn-primary">TRY AGAIN</button>
+        </div>
+
+        <div id="scoreDisplay" class="hidden">0</div>
+        <div id="persistentBestScore" class="persistent-score">BEST: <span id="persistentBestValue">0</span></div>
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>

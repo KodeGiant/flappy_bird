@@ -366,7 +366,10 @@ function gameLoop() {
 
 // Input Listeners
 window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space') jump();
+    if (e.code === 'Space') {
+        e.preventDefault();
+        jump();
+    }
 });
 window.addEventListener('mousedown', jump);
 window.addEventListener('touchstart', (e) => {

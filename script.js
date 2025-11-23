@@ -37,6 +37,7 @@ const persistentBestValue = document.getElementById('persistentBestValue');
 const nameInputModal = document.getElementById('nameInputModal');
 const playerNameInput = document.getElementById('playerName');
 const submitNameBtn = document.getElementById('submitNameBtn');
+const skipNameBtn = document.getElementById('skipNameBtn');
 const newHighScoreEl = document.getElementById('newHighScore');
 const startLeaderboard = document.getElementById('startLeaderboard');
 const gameOverLeaderboard = document.getElementById('gameOverLeaderboard');
@@ -135,6 +136,27 @@ function playJumpSound() {
     oscillator.stop(audioCtx.currentTime + 0.1);
 }
 
+function playCoinSound() {
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1);
+
+    gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.15);
+}
+
 // Game State
 let frames = 0;
 let score = 0;
@@ -142,6 +164,96 @@ let bestScore = localStorage.getItem('flappy_best_score') || 0;
 let gameState = 'START'; // START, PLAYING, GAMEOVER, ENTERING_NAME
 let gameSpeed = 3;
 let pendingScore = 0; // Score waiting to be saved with name
+
+// Coins
+const coins = {
+    items: [],
+    size: 15,
+    spawnChance: 0.02, // 2% chance per frame to spawn
+
+    draw: function() {
+        this.items.forEach(coin => {
+            ctx.save();
+            ctx.translate(coin.x, coin.y);
+
+            // Coin body (gold circle)
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+            ctx.fillStyle = '#FFD700';
+            ctx.fill();
+            ctx.strokeStyle = '#DAA520';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Inner circle for depth
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size * 0.7, 0, Math.PI * 2);
+            ctx.strokeStyle = '#FFA500';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Dollar sign or star
+            ctx.fillStyle = '#DAA520';
+            ctx.font = `bold ${this.size}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('★', 0, 0);
+
+            ctx.restore();
+        });
+    },
+
+    update: function() {
+        // Spawn new coins in the gap between pipes
+        if (Math.random() < this.spawnChance && this.items.length < 5) {
+            // Find the most recent pipe to place coin in its gap
+            let lastPipe = pipes.items[pipes.items.length - 1];
+            let safeY;
+            if (lastPipe && lastPipe.x > canvas.width - 100) {
+                // Place coin in the pipe gap
+                let gapTop = lastPipe.top;
+                let gapBottom = canvas.height - lastPipe.bottom;
+                safeY = gapTop + (gapBottom - gapTop) / 2;
+            } else {
+                // No recent pipe, spawn in middle area
+                safeY = canvas.height / 2 + (Math.random() - 0.5) * 200;
+            }
+            this.items.push({
+                x: canvas.width + this.size,
+                y: safeY
+            });
+        }
+
+        // Move and check coins
+        for (let i = this.items.length - 1; i >= 0; i--) {
+            let coin = this.items[i];
+            coin.x -= pipes.dx; // Move at same speed as pipes
+
+            // Check collision with bird
+            let dx = bird.x - coin.x;
+            let dy = bird.y - coin.y;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < bird.radius + this.size) {
+                // Coin collected!
+                this.items.splice(i, 1);
+                score += 5; // Coins worth 5 points
+                scoreDisplay.innerText = score;
+                playCoinSound();
+                continue;
+            }
+
+            // Remove off-screen coins
+            if (coin.x + this.size < 0) {
+                this.items.splice(i, 1);
+            }
+        }
+    },
+
+    reset: function() {
+        this.items = [];
+    }
+};
 
 // Leaderboard
 const MAX_LEADERBOARD_ENTRIES = 10;
@@ -537,6 +649,7 @@ function startGame() {
     bird.reset();
     bird.jump();
     pipes.reset();
+    coins.reset();
     frames = 0;
     startBgMusic();
 }
@@ -576,6 +689,7 @@ function resetGame() {
     startScreen.classList.remove('hidden');
     bird.reset();
     pipes.reset();
+    coins.reset();
     particles.length = 0;
 }
 
@@ -600,6 +714,15 @@ async function submitHighScore() {
     gameOverScreen.classList.remove('hidden');
 }
 
+function skipHighScore() {
+    gameState = 'GAMEOVER';
+    nameInputModal.classList.add('hidden');
+    currentScoreEl.innerText = pendingScore;
+    bestScoreEl.innerText = bestScore;
+    renderLeaderboard(gameOverLeaderboard, null);
+    gameOverScreen.classList.remove('hidden');
+}
+
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -609,6 +732,8 @@ function gameLoop() {
     if (gameState === 'PLAYING') {
         pipes.update();
         pipes.draw();
+        coins.update();
+        coins.draw();
         bird.update();
         bird.draw();
         frames++;
@@ -656,6 +781,11 @@ restartBtn.addEventListener('click', (e) => {
 submitNameBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     submitHighScore();
+});
+
+skipNameBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    skipHighScore();
 });
 
 playerNameInput.addEventListener('keydown', (e) => {

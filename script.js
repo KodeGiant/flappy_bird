@@ -42,121 +42,6 @@ const newHighScoreEl = document.getElementById('newHighScore');
 const startLeaderboard = document.getElementById('startLeaderboard');
 const gameOverLeaderboard = document.getElementById('gameOverLeaderboard');
 
-// Audio
-const AudioContext = window.AudioContext || window.webkitAudioContext;
-const audioCtx = new AudioContext();
-
-// Background Music
-let bgMusicPlaying = false;
-let bgMusicInterval = null;
-const bgMusicTempo = 140; // BPM
-const beatDuration = 60 / bgMusicTempo;
-
-// Simple chiptune melody pattern (frequencies in Hz)
-const melodyNotes = [
-    330, 330, 0, 330, 0, 262, 330, 0, 392, 0, 0, 0, 196, 0, 0, 0,
-    262, 0, 0, 196, 0, 0, 165, 0, 0, 220, 0, 247, 0, 233, 220, 0,
-    196, 330, 392, 440, 0, 349, 392, 0, 330, 0, 262, 294, 247, 0, 0, 0
-];
-const bassNotes = [
-    131, 131, 131, 131, 165, 165, 165, 165, 196, 196, 196, 196, 98, 98, 98, 98,
-    131, 131, 131, 98, 98, 98, 82, 82, 82, 110, 110, 123, 123, 117, 110, 110,
-    98, 165, 196, 220, 220, 175, 196, 196, 165, 165, 131, 147, 123, 123, 123, 123
-];
-
-let currentNote = 0;
-
-function playNote(frequency, duration, type = 'square', volume = 0.08) {
-    if (frequency === 0) return;
-
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
-
-    gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration * 0.9);
-
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + duration);
-}
-
-function playBgMusicNote() {
-    if (!bgMusicPlaying) return;
-
-    const melodyFreq = melodyNotes[currentNote % melodyNotes.length];
-    const bassFreq = bassNotes[currentNote % bassNotes.length];
-
-    playNote(melodyFreq, beatDuration * 0.8, 'square', 0.06);
-    playNote(bassFreq, beatDuration * 0.8, 'triangle', 0.1);
-
-    currentNote++;
-}
-
-function startBgMusic() {
-    if (bgMusicPlaying) return;
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
-    bgMusicPlaying = true;
-    currentNote = 0;
-    bgMusicInterval = setInterval(playBgMusicNote, beatDuration * 1000 / 2);
-}
-
-function stopBgMusic() {
-    bgMusicPlaying = false;
-    if (bgMusicInterval) {
-        clearInterval(bgMusicInterval);
-        bgMusicInterval = null;
-    }
-}
-
-function playJumpSound() {
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-
-    oscillator.type = 'square';
-    oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
-    oscillator.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.1);
-
-    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + 0.1);
-}
-
-function playCoinSound() {
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
-    oscillator.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1);
-
-    gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
-
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + 0.15);
-}
-
 // Game State
 let frames = 0;
 let score = 0;
@@ -173,22 +58,6 @@ const activePowerups = {
     magnet: 0,
     tiny: 0
 };
-
-function playPowerupSound() {
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(523, audioCtx.currentTime);
-    oscillator.frequency.exponentialRampToValueAtTime(1047, audioCtx.currentTime + 0.1);
-    oscillator.frequency.exponentialRampToValueAtTime(1568, audioCtx.currentTime + 0.2);
-    gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + 0.25);
-}
 
 // Powerup types
 const POWERUP_TYPES = {
@@ -1055,6 +924,7 @@ playerNameInput.addEventListener('keyup', (e) => {
 // Init
 bird.reset();
 persistentBestValue.innerText = bestScore;
+initMusicSelector();
 // Load leaderboard from Firebase on startup
 renderLeaderboardAsync(startLeaderboard);
 gameLoop();

@@ -311,3 +311,49 @@ canvas {
 .btn-link:hover {
     color: var(--text-color);
 }
+
+/* Music Selector */
+.music-selector {
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.music-selector-label {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-color);
+    opacity: 0.8;
+    margin-bottom: 0.5rem;
+}
+
+.music-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.music-btn {
+    background: var(--ui-bg);
+    border: 1px solid var(--ui-border);
+    color: var(--text-color);
+    padding: 0.4rem 0.8rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: var(--font-main);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.music-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.music-btn.active {
+    background: var(--primary-color);
+    color: #333;
+    border-color: var(--primary-color);
+}

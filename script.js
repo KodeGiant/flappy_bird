@@ -165,6 +165,136 @@ let gameState = 'START'; // START, PLAYING, GAMEOVER, ENTERING_NAME
 let gameSpeed = 3;
 let pendingScore = 0; // Score waiting to be saved with name
 
+// Active Powerups
+const activePowerups = {
+    slowdown: 0,      // frames remaining
+    invincibility: 0,
+    magnet: 0,
+    tiny: 0
+};
+
+function playPowerupSound() {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(523, audioCtx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(1047, audioCtx.currentTime + 0.1);
+    oscillator.frequency.exponentialRampToValueAtTime(1568, audioCtx.currentTime + 0.2);
+    gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.25);
+}
+
+// Powerup types
+const POWERUP_TYPES = {
+    slowdown: { color: '#00BFFF', icon: '⏱', duration: 300 },      // 5 seconds at 60fps
+    invincibility: { color: '#FFD700', icon: '⭐', duration: 180 }, // 3 seconds
+    magnet: { color: '#FF69B4', icon: '🧲', duration: 360 },       // 6 seconds
+    tiny: { color: '#90EE90', icon: '🔬', duration: 240 }          // 4 seconds
+};
+
+// Powerups system
+const powerups = {
+    items: [],
+    size: 18,
+    spawnChance: 0.003, // Rarer than coins
+
+    draw: function() {
+        this.items.forEach(p => {
+            const type = POWERUP_TYPES[p.type];
+            ctx.save();
+            ctx.translate(p.x, p.y);
+
+            // Pulsing glow effect
+            const pulse = Math.sin(Date.now() / 150) * 0.3 + 0.7;
+            ctx.shadowColor = type.color;
+            ctx.shadowBlur = 15 * pulse;
+
+            // Powerup body
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+            ctx.fillStyle = type.color;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Icon
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#fff';
+            ctx.font = `${this.size}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(type.icon, 0, 0);
+
+            ctx.restore();
+        });
+    },
+
+    update: function() {
+        // Spawn new powerups rarely
+        if (Math.random() < this.spawnChance && this.items.length < 2) {
+            const types = Object.keys(POWERUP_TYPES);
+            const randomType = types[Math.floor(Math.random() * types.length)];
+            let lastPipe = pipes.items[pipes.items.length - 1];
+            let safeY;
+            if (lastPipe && lastPipe.x > canvas.width - 100) {
+                let gapTop = lastPipe.top;
+                let gapBottom = canvas.height - lastPipe.bottom;
+                safeY = gapTop + (gapBottom - gapTop) / 2;
+            } else {
+                safeY = canvas.height / 2 + (Math.random() - 0.5) * 200;
+            }
+            this.items.push({
+                x: canvas.width + this.size,
+                y: safeY,
+                type: randomType
+            });
+        }
+
+        // Move and check powerups
+        for (let i = this.items.length - 1; i >= 0; i--) {
+            let p = this.items[i];
+            p.x -= pipes.dx;
+
+            // Check collision with bird
+            let dx = bird.x - p.x;
+            let dy = bird.y - p.y;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+            const birdRadius = activePowerups.tiny > 0 ? bird.radius * 0.5 : bird.radius;
+
+            if (distance < birdRadius + this.size) {
+                // Powerup collected!
+                this.items.splice(i, 1);
+                activePowerups[p.type] = POWERUP_TYPES[p.type].duration;
+                playPowerupSound();
+                continue;
+            }
+
+            // Remove off-screen
+            if (p.x + this.size < 0) {
+                this.items.splice(i, 1);
+            }
+        }
+
+        // Decrement active powerup timers
+        for (let key in activePowerups) {
+            if (activePowerups[key] > 0) activePowerups[key]--;
+        }
+    },
+
+    reset: function() {
+        this.items = [];
+        for (let key in activePowerups) {
+            activePowerups[key] = 0;
+        }
+    }
+};
+
 // Coins
 const coins = {
     items: [],
@@ -227,14 +357,27 @@ const coins = {
         // Move and check coins
         for (let i = this.items.length - 1; i >= 0; i--) {
             let coin = this.items[i];
-            coin.x -= pipes.dx; // Move at same speed as pipes
+            const speed = activePowerups.slowdown > 0 ? pipes.dx * 0.5 : pipes.dx;
+            coin.x -= speed;
 
-            // Check collision with bird
+            // Magnet effect - coins are attracted to bird
             let dx = bird.x - coin.x;
             let dy = bird.y - coin.y;
             let distance = Math.sqrt(dx * dx + dy * dy);
 
-            if (distance < bird.radius + this.size) {
+            if (activePowerups.magnet > 0 && distance < 150) {
+                const magnetStrength = 0.15;
+                coin.x += dx * magnetStrength;
+                coin.y += dy * magnetStrength;
+                // Recalculate distance after magnet pull
+                dx = bird.x - coin.x;
+                dy = bird.y - coin.y;
+                distance = Math.sqrt(dx * dx + dy * dy);
+            }
+
+            // Check collision with bird
+            const hitRadius = activePowerups.tiny > 0 ? bird.radius * 0.5 : bird.radius;
+            if (distance < hitRadius + this.size) {
                 // Coin collected!
                 this.items.splice(i, 1);
                 score += 5; // Coins worth 5 points
@@ -406,10 +549,22 @@ const bird = {
         this.rotation = Math.min(Math.PI / 4, Math.max(-Math.PI / 4, (this.velocity * 0.1)));
         ctx.rotate(this.rotation);
 
+        // Scale down if tiny powerup is active
+        const scale = activePowerups.tiny > 0 ? 0.5 : 1;
+        ctx.scale(scale, scale);
+
+        // Invincibility glow effect
+        if (activePowerups.invincibility > 0) {
+            const pulse = Math.sin(Date.now() / 100) * 0.5 + 0.5;
+            ctx.shadowColor = '#FFD700';
+            ctx.shadowBlur = 20 + pulse * 10;
+        }
+
         // Body
         ctx.beginPath();
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = '#FFD700';
+        ctx.fillStyle = activePowerups.invincibility > 0 ?
+            `hsl(${(Date.now() / 10) % 360}, 100%, 60%)` : '#FFD700';
         ctx.fill();
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
@@ -446,9 +601,11 @@ const bird = {
         this.velocity += this.gravity;
         this.y += this.velocity;
 
-        // Floor collision
-        if (this.y + this.radius >= canvas.height) {
-            this.y = canvas.height - this.radius;
+        const hitRadius = activePowerups.tiny > 0 ? this.radius * 0.5 : this.radius;
+
+        // Floor collision (invincibility doesn't help with floor)
+        if (this.y + hitRadius >= canvas.height) {
+            this.y = canvas.height - hitRadius;
             gameOver();
         }
 
@@ -515,14 +672,20 @@ const pipes = {
 
         for (let i = 0; i < this.items.length; i++) {
             let p = this.items[i];
-            p.x -= this.dx;
+            // Slowdown powerup reduces speed by half
+            const speed = activePowerups.slowdown > 0 ? this.dx * 0.5 : this.dx;
+            p.x -= speed;
 
-            // Collision Detection
-            // Horizontal check
-            if (bird.x + bird.radius > p.x && bird.x - bird.radius < p.x + this.w) {
-                // Vertical check
-                if (bird.y - bird.radius < p.top || bird.y + bird.radius > canvas.height - p.bottom) {
-                    gameOver();
+            // Collision Detection (skip if invincible)
+            if (activePowerups.invincibility <= 0) {
+                // Adjust hitbox for tiny powerup
+                const hitRadius = activePowerups.tiny > 0 ? bird.radius * 0.5 : bird.radius;
+                // Horizontal check
+                if (bird.x + hitRadius > p.x && bird.x - hitRadius < p.x + this.w) {
+                    // Vertical check
+                    if (bird.y - hitRadius < p.top || bird.y + hitRadius > canvas.height - p.bottom) {
+                        gameOver();
+                    }
                 }
             }
 
@@ -650,6 +813,7 @@ function startGame() {
     bird.jump();
     pipes.reset();
     coins.reset();
+    powerups.reset();
     frames = 0;
     startBgMusic();
 }
@@ -690,6 +854,7 @@ function resetGame() {
     bird.reset();
     pipes.reset();
     coins.reset();
+    powerups.reset();
     particles.length = 0;
 }
 
@@ -738,6 +903,40 @@ function skipHighScore() {
     gameOverScreen.classList.remove('hidden');
 }
 
+// Draw active powerup indicators
+function drawPowerupIndicators() {
+    let offsetY = 60;
+    for (let key in activePowerups) {
+        if (activePowerups[key] > 0) {
+            const type = POWERUP_TYPES[key];
+            const remaining = activePowerups[key] / type.duration;
+
+            ctx.save();
+
+            // Background bar
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect(10, offsetY, 80, 16);
+
+            // Progress bar
+            ctx.fillStyle = type.color;
+            ctx.fillRect(10, offsetY, 80 * remaining, 16);
+
+            // Border
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(10, offsetY, 80, 16);
+
+            // Icon
+            ctx.font = '12px Arial';
+            ctx.fillStyle = '#fff';
+            ctx.fillText(type.icon, 14, offsetY + 13);
+
+            ctx.restore();
+            offsetY += 22;
+        }
+    }
+}
+
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -749,8 +948,11 @@ function gameLoop() {
         pipes.draw();
         coins.update();
         coins.draw();
+        powerups.update();
+        powerups.draw();
         bird.update();
         bird.draw();
+        drawPowerupIndicators();
         frames++;
     } else if (gameState === 'START') {
         bird.y = canvas.height / 2 + Math.sin(Date.now() / 300) * 10;

@@ -1,6 +1,30 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// Firebase Configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyCDvc14LKKWbFtMxVucBMcVxbKY_mMgAlc",
+    authDomain: "flappy-bird-cc12a.firebaseapp.com",
+    databaseURL: "https://flappy-bird-cc12a-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "flappy-bird-cc12a",
+    storageBucket: "flappy-bird-cc12a.firebasestorage.app",
+    messagingSenderId: "292128610728",
+    appId: "1:292128610728:web:640d038741a0bff4fee59d"
+};
+
+// Initialize Firebase
+let firebaseInitialized = false;
+let database = null;
+
+try {
+    firebase.initializeApp(firebaseConfig);
+    database = firebase.database();
+    firebaseInitialized = true;
+    console.log('Firebase initialized successfully');
+} catch (error) {
+    console.warn('Firebase initialization failed, using localStorage only:', error);
+}
+
 // UI Elements
 const startScreen = document.getElementById('startScreen');
 const gameOverScreen = document.getElementById('gameOverScreen');
@@ -52,16 +76,47 @@ let pendingScore = 0; // Score waiting to be saved with name
 
 // Leaderboard
 const MAX_LEADERBOARD_ENTRIES = 10;
+let cachedLeaderboard = [];
 
-function getLeaderboard() {
+// Get leaderboard from localStorage (fallback/cache)
+function getLocalLeaderboard() {
     const data = localStorage.getItem('flappy_leaderboard');
     return data ? JSON.parse(data) : [];
 }
 
-function saveLeaderboard(leaderboard) {
+// Save leaderboard to localStorage
+function saveLocalLeaderboard(leaderboard) {
     localStorage.setItem('flappy_leaderboard', JSON.stringify(leaderboard));
 }
 
+// Fetch leaderboard from Firebase
+async function fetchLeaderboardFromFirebase() {
+    if (!firebaseInitialized) {
+        return getLocalLeaderboard();
+    }
+
+    try {
+        const snapshot = await database.ref('leaderboard').orderByChild('score').limitToLast(MAX_LEADERBOARD_ENTRIES).once('value');
+        const data = snapshot.val();
+        if (!data) return [];
+
+        const leaderboard = Object.values(data).sort((a, b) => b.score - a.score);
+        // Update local cache
+        saveLocalLeaderboard(leaderboard);
+        cachedLeaderboard = leaderboard;
+        return leaderboard;
+    } catch (error) {
+        console.warn('Failed to fetch from Firebase, using local cache:', error);
+        return getLocalLeaderboard();
+    }
+}
+
+// Get current leaderboard (cached)
+function getLeaderboard() {
+    return cachedLeaderboard.length > 0 ? cachedLeaderboard : getLocalLeaderboard();
+}
+
+// Check if score qualifies for top 10
 function isTopScore(newScore) {
     if (newScore <= 0) return false;
     const leaderboard = getLeaderboard();
@@ -69,17 +124,43 @@ function isTopScore(newScore) {
     return newScore > leaderboard[leaderboard.length - 1].score;
 }
 
-function addToLeaderboard(name, newScore) {
-    const leaderboard = getLeaderboard();
-    leaderboard.push({ name: name.toUpperCase(), score: newScore });
+// Add score to leaderboard (Firebase + localStorage)
+async function addToLeaderboard(name, newScore) {
+    const entry = {
+        name: name.toUpperCase(),
+        score: newScore,
+        timestamp: Date.now()
+    };
+
+    // Always save locally first
+    let leaderboard = getLocalLeaderboard();
+    leaderboard.push(entry);
     leaderboard.sort((a, b) => b.score - a.score);
     if (leaderboard.length > MAX_LEADERBOARD_ENTRIES) {
         leaderboard.length = MAX_LEADERBOARD_ENTRIES;
     }
-    saveLeaderboard(leaderboard);
-    return leaderboard;
+    saveLocalLeaderboard(leaderboard);
+    cachedLeaderboard = leaderboard;
+
+    // Try to save to Firebase (with timeout)
+    if (firebaseInitialized) {
+        try {
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Firebase timeout')), 5000)
+            );
+            const savePromise = database.ref('leaderboard').push(entry);
+            await Promise.race([savePromise, timeoutPromise]);
+            // Refresh from Firebase to get accurate global leaderboard
+            await Promise.race([fetchLeaderboardFromFirebase(), timeoutPromise]);
+        } catch (error) {
+            console.warn('Failed to save to Firebase:', error);
+        }
+    }
+
+    return getLeaderboard();
 }
 
+// Render leaderboard to container
 function renderLeaderboard(container, highlightScore = null) {
     const leaderboard = getLeaderboard();
 
@@ -103,6 +184,18 @@ function renderLeaderboard(container, highlightScore = null) {
         `;
     });
     container.innerHTML = html;
+}
+
+// Async render that fetches fresh data from Firebase
+async function renderLeaderboardAsync(container, highlightScore = null) {
+    // Show loading state
+    container.innerHTML = `
+        <div class="leaderboard-title">Top 10</div>
+        <div class="leaderboard-empty">Loading...</div>
+    `;
+
+    await fetchLeaderboardFromFirebase();
+    renderLeaderboard(container, highlightScore);
 }
 
 // Resize Canvas
@@ -408,18 +501,25 @@ function resetGame() {
     gameState = 'START';
     gameOverScreen.classList.add('hidden');
     nameInputModal.classList.add('hidden');
-    renderLeaderboard(startLeaderboard);
+    renderLeaderboardAsync(startLeaderboard);
     startScreen.classList.remove('hidden');
     bird.reset();
     pipes.reset();
     particles.length = 0;
 }
 
-function submitHighScore() {
+async function submitHighScore() {
     let name = playerNameInput.value.trim();
     if (!name) name = 'AAA';
 
-    addToLeaderboard(name, pendingScore);
+    // Disable button while saving
+    submitNameBtn.disabled = true;
+    submitNameBtn.innerText = 'SAVING...';
+
+    await addToLeaderboard(name, pendingScore);
+
+    submitNameBtn.disabled = false;
+    submitNameBtn.innerText = 'SUBMIT';
 
     gameState = 'GAMEOVER';
     nameInputModal.classList.add('hidden');
@@ -503,5 +603,6 @@ playerNameInput.addEventListener('keyup', (e) => {
 // Init
 bird.reset();
 persistentBestValue.innerText = bestScore;
-renderLeaderboard(startLeaderboard);
+// Load leaderboard from Firebase on startup
+renderLeaderboardAsync(startLeaderboard);
 gameLoop();

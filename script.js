@@ -693,9 +693,24 @@ function resetGame() {
     particles.length = 0;
 }
 
+// Bad words filter
+const badWords = ['fuck', 'shit', 'ass', 'damn', 'bitch', 'cunt', 'dick', 'cock', 'pussy', 'fag', 'nigger', 'nigga', 'whore', 'slut', 'bastard', 'piss', 'crap'];
+
+function containsBadWord(text) {
+    const lower = text.toLowerCase();
+    return badWords.some(word => lower.includes(word));
+}
+
 async function submitHighScore() {
     let name = playerNameInput.value.trim();
     if (!name) name = 'AAA';
+
+    if (containsBadWord(name)) {
+        playerNameInput.value = '';
+        playerNameInput.placeholder = 'Nice try...';
+        playerNameInput.focus();
+        return;
+    }
 
     // Disable button while saving
     submitNameBtn.disabled = true;
@@ -792,6 +807,10 @@ playerNameInput.addEventListener('keydown', (e) => {
     if (e.code === 'Enter') {
         e.preventDefault();
         submitHighScore();
+    }
+    if (e.code === 'Escape') {
+        e.preventDefault();
+        skipHighScore();
     }
     e.stopPropagation();
 });

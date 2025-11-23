@@ -529,20 +529,34 @@ const pipes = {
         }
     },
 
-    update: function () {
-        // Add new pipe every 100 frames (approx 1.6s at 60fps)
-        if (frames % 120 === 0) {
-            // Calculate random positions
-            // Min pipe height = 50
-            let maxTop = canvas.height - this.gap - 50;
-            let topHeight = Math.floor(Math.random() * (maxTop - 50 + 1)) + 50;
+    spawnInterval: 350, // Fixed pixel distance between pipes
 
-            this.items.push({
-                x: canvas.width,
-                top: topHeight,
-                bottom: canvas.height - this.gap - topHeight,
-                passed: false
-            });
+    spawnPipe: function(x) {
+        let maxTop = canvas.height - this.gap - 50;
+        let topHeight = Math.floor(Math.random() * (maxTop - 50 + 1)) + 50;
+        this.items.push({
+            x: x,
+            top: topHeight,
+            bottom: canvas.height - this.gap - topHeight,
+            passed: x < bird.x // Mark as passed if already behind bird
+        });
+    },
+
+    fillScreen: function() {
+        // Pre-fill screen with pipes from bird position to right edge
+        const startX = 350; // First pipe position
+        for (let x = startX; x < canvas.width + this.spawnInterval; x += this.spawnInterval) {
+            this.spawnPipe(x);
+        }
+    },
+
+    update: function () {
+        // Spawn new pipe when last pipe is far enough from right edge
+        const lastPipe = this.items[this.items.length - 1];
+        const shouldSpawn = !lastPipe || lastPipe.x < canvas.width - this.spawnInterval;
+
+        if (shouldSpawn) {
+            this.spawnPipe(canvas.width);
         }
 
         for (let i = 0; i < this.items.length; i++) {
@@ -687,6 +701,7 @@ function startGame() {
     bird.reset();
     bird.jump();
     pipes.reset();
+    pipes.fillScreen(); // Pre-fill screen with pipes
     coins.reset();
     powerups.reset();
     lives = 1;

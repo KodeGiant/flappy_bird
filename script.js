@@ -529,7 +529,13 @@ const pipes = {
         }
     },
 
-    spawnInterval: 350, // Fixed pixel distance between pipes
+    // Pipe spacing scales with screen height - taller screens need more horizontal
+    // distance for the bird to traverse larger vertical gaps
+    getSpawnInterval: function() {
+        const baseInterval = 350; // Base interval for a ~600px tall screen
+        const baseHeight = 600;
+        return baseInterval + (canvas.height - baseHeight) * 0.25;
+    },
 
     spawnPipe: function(x) {
         let maxTop = canvas.height - this.gap - 50;
@@ -544,16 +550,18 @@ const pipes = {
 
     fillScreen: function() {
         // Pre-fill screen with pipes from bird position to right edge
-        const startX = 350; // First pipe position
-        for (let x = startX; x < canvas.width + this.spawnInterval; x += this.spawnInterval) {
+        const interval = this.getSpawnInterval();
+        const startX = interval; // First pipe position
+        for (let x = startX; x < canvas.width + interval; x += interval) {
             this.spawnPipe(x);
         }
     },
 
     update: function () {
         // Spawn new pipe when last pipe is far enough from right edge
+        const interval = this.getSpawnInterval();
         const lastPipe = this.items[this.items.length - 1];
-        const shouldSpawn = !lastPipe || lastPipe.x < canvas.width - this.spawnInterval;
+        const shouldSpawn = !lastPipe || lastPipe.x < canvas.width - interval;
 
         if (shouldSpawn) {
             this.spawnPipe(canvas.width);

@@ -894,6 +894,10 @@ window.addEventListener('mousedown', (e) => {
     }
 });
 window.addEventListener('touchstart', (e) => {
+    // Don't intercept touches on buttons
+    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') {
+        return;
+    }
     if (gameState !== 'ENTERING_NAME') {
         e.preventDefault(); // prevent scrolling
         jump();
